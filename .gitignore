@@ -1,0 +1,9 @@
+*.xcuserstate
+xcuserdata/
+build/
+DerivedData/
+IROViewer.xcodeproj/
+Info.plist
+Payload/
+*.ipa
+.DS_Store
