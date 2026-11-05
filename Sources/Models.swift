@@ -30,4 +30,9 @@ struct MediaItem: Identifiable, Hashable {
     var sizeText: String {
         ByteCountFormatter.string(fromByteCount: size, countStyle: .file)
     }
+
+    var isVideo: Bool {
+        let ext = (fileName as NSString).pathExtension.lowercased()
+        return ["ts", "mp4", "mov"].contains(ext)
+    }
 }

@@ -3,7 +3,7 @@ import SwiftUI
 
 struct PlaybackView: View {
     let items: [MediaItem]
-    let startIndex: Int
+    let selected: MediaItem
 
     @StateObject private var engine = PlayerEngine()
     @Environment(\.dismiss) private var dismiss
@@ -74,11 +74,49 @@ struct PlaybackView: View {
         }
         .statusBarHidden()
         .onAppear {
-            engine.start(items: items, at: startIndex)
+            engine.start(items: items, selected: selected)
         }
         .onDisappear {
             engine.stop()
         }
+    }
+}
+
+/// 照片不是视频，单独显示，不走播放器
+struct PhotoPreviewView: View {
+    let item: MediaItem
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+
+            AsyncImage(url: item.url) { image in
+                image
+                    .resizable()
+                    .scaledToFit()
+            } placeholder: {
+                ProgressView()
+                    .tint(.white)
+            }
+
+            VStack {
+                HStack {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title2)
+                            .foregroundStyle(.white.opacity(0.85))
+                    }
+                    Spacer()
+                }
+                .padding()
+                Spacer()
+            }
+        }
+        .statusBarHidden()
     }
 }
 

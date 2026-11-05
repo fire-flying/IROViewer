@@ -5,8 +5,7 @@ struct ContentView: View {
     @State private var items: [MediaItem] = []
     @State private var isLoading = false
     @State private var errorText: String?
-    @State private var playIndex: Int = 0
-    @State private var showPlayer = false
+    @State private var selected: MediaItem?
 
     private let client = CameraClient()
 
@@ -43,10 +42,9 @@ struct ContentView: View {
                         Text("没有找到文件")
                             .foregroundStyle(.secondary)
                     } else {
-                        ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                        ForEach(items) { item in
                             Button {
-                                playIndex = index
-                                showPlayer = true
+                                selected = item
                             } label: {
                                 row(item)
                             }
@@ -73,8 +71,12 @@ struct ContentView: View {
             .onChange(of: category) { _ in
                 Task { await load() }
             }
-            .fullScreenCover(isPresented: $showPlayer) {
-                PlaybackView(items: items, startIndex: playIndex)
+            .fullScreenCover(item: $selected) { item in
+                if item.isVideo {
+                    PlaybackView(items: items, selected: item)
+                } else {
+                    PhotoPreviewView(item: item)
+                }
             }
         }
     }
