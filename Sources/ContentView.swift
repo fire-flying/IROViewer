@@ -5,9 +5,23 @@ struct ContentView: View {
     @State private var items: [MediaItem] = []
     @State private var isLoading = false
     @State private var errorText: String?
-    @State private var selected: MediaItem?
+    @State private var destination: Destination?
 
     private let client = CameraClient()
+
+    /// 行程列表按日期分组，最新的日期和行程在最前
+    private var tripGroups: [(date: String, trips: [Trip])] {
+        var groups: [(date: String, trips: [Trip])] = []
+        for trip in TripBuilder.build(from: items) {
+            let date = trip.dateText
+            if let index = groups.firstIndex(where: { $0.date == date }) {
+                groups[index].trips.append(trip)
+            } else {
+                groups.append((date, [trip]))
+            }
+        }
+        return groups
+    }
 
     var body: some View {
         NavigationStack {
@@ -32,27 +46,42 @@ struct ContentView: View {
                     }
                 }
 
-                Section {
-                    if isLoading {
+                if isLoading {
+                    Section {
                         HStack(spacing: 12) {
                             ProgressView()
                             Text("正在读取车机文件列表…")
                         }
-                    } else if items.isEmpty {
+                    }
+                } else if items.isEmpty {
+                    Section {
                         Text("没有找到文件")
                             .foregroundStyle(.secondary)
-                    } else {
+                    }
+                } else if category == .photo {
+                    Section("照片") {
                         ForEach(items) { item in
                             Button {
-                                selected = item
+                                destination = .photo(item)
                             } label: {
-                                row(item)
+                                photoRow(item)
                             }
                             .buttonStyle(.plain)
                         }
                     }
-                } header: {
-                    Text(items.isEmpty ? "文件" : "共 \(items.count) 段 · 点任意一段开始连播")
+                } else {
+                    ForEach(tripGroups, id: \.date) { group in
+                        Section(group.date) {
+                            ForEach(group.trips) { trip in
+                                Button {
+                                    destination = .trip(trip)
+                                } label: {
+                                    tripRow(trip)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
                 }
             }
             .navigationTitle("IRO 记录仪")
@@ -71,19 +100,42 @@ struct ContentView: View {
             .onChange(of: category) { _ in
                 Task { await load() }
             }
-            .fullScreenCover(item: $selected) { item in
-                if item.isVideo {
-                    PlaybackView(items: items, selected: item)
-                } else {
+            .fullScreenCover(item: $destination) { target in
+                switch target {
+                case .trip(let trip):
+                    PlaybackView(items: trip.items, selected: trip.first)
+                case .photo(let item):
                     PhotoPreviewView(item: item)
                 }
             }
         }
     }
 
-    private func row(_ item: MediaItem) -> some View {
+    private func tripRow(_ trip: Trip) -> some View {
         HStack(spacing: 12) {
-            Image(systemName: item.name.lowercased().hasSuffix(".ts") ? "video.fill" : "photo.fill")
+            Image(systemName: "car.fill")
+                .foregroundStyle(.secondary)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(trip.timeRange)
+                    .font(.body.monospacedDigit())
+                Text("\(trip.items.count) 段 · \(trip.totalSizeText)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            Image(systemName: "play.circle.fill")
+                .font(.title3)
+                .foregroundStyle(.tint)
+        }
+        .padding(.vertical, 2)
+    }
+
+    private func photoRow(_ item: MediaItem) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: "photo.fill")
                 .foregroundStyle(.secondary)
 
             VStack(alignment: .leading, spacing: 3) {
@@ -117,6 +169,18 @@ struct ContentView: View {
         } catch {
             items = []
             errorText = error.localizedDescription
+        }
+    }
+}
+
+enum Destination: Identifiable {
+    case trip(Trip)
+    case photo(MediaItem)
+
+    var id: String {
+        switch self {
+        case .trip(let trip): return "trip-" + trip.id
+        case .photo(let item): return "photo-" + item.id
         }
     }
 }

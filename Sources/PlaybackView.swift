@@ -1,4 +1,5 @@
 import AVFoundation
+import MobileVLCKit
 import SwiftUI
 
 struct PlaybackView: View {
@@ -11,7 +12,7 @@ struct PlaybackView: View {
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
-            PlayerLayerView(player: engine.player).ignoresSafeArea()
+            VLCVideoContainer(engine: engine).ignoresSafeArea()
 
             VStack {
                 HStack {
@@ -82,7 +83,7 @@ struct PlaybackView: View {
     }
 }
 
-/// 照片不是视频，单独显示，不走播放器
+/// 照片不是视频，单独显示
 struct PhotoPreviewView: View {
     let item: MediaItem
 
@@ -120,26 +121,15 @@ struct PhotoPreviewView: View {
     }
 }
 
-private final class PlayerUIView: UIView {
-    override class var layerClass: AnyClass { AVPlayerLayer.self }
+private struct VLCVideoContainer: UIViewRepresentable {
+    @ObservedObject var engine: PlayerEngine
 
-    var playerLayer: AVPlayerLayer {
-        layer as! AVPlayerLayer
-    }
-}
-
-private struct PlayerLayerView: UIViewRepresentable {
-    let player: AVPlayer
-
-    func makeUIView(context: Context) -> PlayerUIView {
-        let view = PlayerUIView()
+    func makeUIView(context: Context) -> VLCVideoView {
+        let view = VLCVideoView()
         view.backgroundColor = .black
-        view.playerLayer.player = player
-        view.playerLayer.videoGravity = .resizeAspect
+        engine.attach(drawable: view)
         return view
     }
 
-    func updateUIView(_ uiView: PlayerUIView, context: Context) {
-        uiView.playerLayer.player = player
-    }
+    func updateUIView(_ uiView: VLCVideoView, context: Context) {}
 }

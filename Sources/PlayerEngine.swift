@@ -1,98 +1,128 @@
 import AVFoundation
 import Combine
+import MobileVLCKit
 
-/// AVFoundation 不支持直接播放裸 ts 文件，只认 HLS。
-/// 所以用本地 HTTP 服务提供 m3u8 索引，分片仍直连车机。
-@MainActor
-final class PlayerEngine: ObservableObject {
+/// 用 VLCKit 播放。AVFoundation 不认车机的裸 TS 封装，VLC 原生支持，
+/// 且能在同一播放器里顺序连播多段。
+final class PlayerEngine: NSObject, ObservableObject, VLCMediaPlayerDelegate {
     @Published var isPlaying = false
     @Published var currentSegment = 0
     @Published var totalSegments = 0
     @Published var errorText: String?
 
-    let player = AVPlayer()
+    let mediaPlayer = VLCMediaPlayer()
 
-    private let server = LocalPlaylistServer()
     private var items: [MediaItem] = []
-    private var statusObservation: NSKeyValueObservation?
-    private var version = 0
+    private var currentIndex = 0
 
-    nonisolated init() {}
+    override init() {
+        super.init()
+        mediaPlayer.delegate = self
+    }
+
+    func attach(drawable view: UIView) {
+        mediaPlayer.drawable = view
+    }
 
     func start(items: [MediaItem], selected: MediaItem) {
+        configureAudioSession()
+
         let videos = items.filter { $0.isVideo }
         self.items = videos
         totalSegments = videos.count
-        server.start()
-
-        let index = videos.firstIndex(of: selected) ?? 0
-        load(from: index)
+        currentIndex = videos.firstIndex(of: selected) ?? 0
+        playCurrent()
     }
 
-    /// 从指定片段重建索引，AVPlayer 会依次播完后面的所有段
-    func load(from index: Int) {
-        guard !items.isEmpty else {
-            errorText = "没有可播放的视频"
-            return
-        }
+    private func configureAudioSession() {
+        let session = AVAudioSession.sharedInstance()
+        try? session.setCategory(.playback, mode: .moviePlayback)
+        try? session.setActive(true)
+    }
 
-        guard server.port > 0 else {
-            errorText = "本地播放服务启动失败"
-            return
-        }
+    private func playCurrent() {
+        guard currentIndex >= 0, currentIndex < items.count else { return }
 
-        let safeIndex = max(0, min(index, items.count - 1))
-        version += 1
-        server.update(PlaylistBuilder.build(items: items, from: safeIndex))
+        let media = VLCMedia(url: items[currentIndex].url)
+        media.addOptions([
+            "network-caching": 1500,
+            "clock-jitter": 0,
+            "clock-synchro": 0
+        ])
 
-        guard let playlistURL = server.playlistURL(version: version) else {
-            errorText = "无法生成播放地址"
-            return
-        }
+        mediaPlayer.media = media
+        mediaPlayer.play()
 
-        let item = AVPlayerItem(url: playlistURL)
-
-        statusObservation?.invalidate()
-        statusObservation = item.observe(\.status, options: [.new]) { [weak self] item, _ in
-            guard item.status == .failed else { return }
-            let message = item.error?.localizedDescription
-            Task { @MainActor in
-                self?.errorText = message ?? "播放失败，可能已被车机覆盖"
-            }
-        }
-
-        player.replaceCurrentItem(with: item)
-        player.play()
+        currentSegment = currentIndex + 1
         isPlaying = true
         errorText = nil
-        currentSegment = safeIndex + 1
+    }
+
+    func mediaPlayerStateChanged(_ aNotification: Notification) {
+        let state = mediaPlayer.state
+
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+
+            switch state {
+            case .playing:
+                self.isPlaying = true
+
+            case .paused, .stopped:
+                self.isPlaying = false
+
+            case .ended:
+                self.advance()
+
+            case .error:
+                if self.currentIndex + 1 < self.items.count {
+                    self.errorText = "第 \(self.currentIndex + 1) 段无法播放，已跳到下一段"
+                    self.currentIndex += 1
+                    self.playCurrent()
+                } else if self.items.isEmpty == false {
+                    self.errorText = "最后一段无法播放，可能已被车机覆盖"
+                    self.isPlaying = false
+                }
+
+            default:
+                break
+            }
+        }
+    }
+
+    private func advance() {
+        if currentIndex + 1 < items.count {
+            currentIndex += 1
+            playCurrent()
+        } else {
+            isPlaying = false
+        }
     }
 
     func toggle() {
-        if player.rate > 0 {
-            player.pause()
+        if mediaPlayer.isPlaying {
+            mediaPlayer.pause()
             isPlaying = false
         } else {
-            player.play()
+            mediaPlayer.play()
             isPlaying = true
         }
     }
 
     func previous() {
-        guard currentSegment > 1 else { return }
-        load(from: currentSegment - 2)
+        guard currentIndex > 0 else { return }
+        currentIndex -= 1
+        playCurrent()
     }
 
     func next() {
-        guard currentSegment < totalSegments else { return }
-        load(from: currentSegment)
+        guard currentIndex + 1 < items.count else { return }
+        currentIndex += 1
+        playCurrent()
     }
 
     func stop() {
-        player.pause()
-        player.replaceCurrentItem(with: nil)
-        statusObservation?.invalidate()
-        statusObservation = nil
-        server.stop()
+        mediaPlayer.stop()
+        mediaPlayer.drawable = nil
     }
 }

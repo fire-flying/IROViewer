@@ -17,10 +17,13 @@ jobs:
       - name: Generate Xcode project
         run: xcodegen generate
 
+      - name: Install CocoaPods dependencies
+        run: pod install --repo-update
+
       - name: Build unsigned app
         run: |
           xcodebuild \
-            -project IROViewer.xcodeproj \
+            -workspace IROViewer.xcworkspace \
             -scheme IROViewer \
             -sdk iphoneos \
             -destination "generic/platform=iOS" \

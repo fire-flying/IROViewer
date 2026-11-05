@@ -3,6 +3,9 @@ xcuserdata/
 build/
 DerivedData/
 IROViewer.xcodeproj/
+IROViewer.xcworkspace/
+Pods/
+Podfile.lock
 Info.plist
 Payload/
 *.ipa
