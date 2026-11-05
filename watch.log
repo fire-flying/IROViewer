@@ -1,0 +1,9 @@
+﻿gh : failed to get run: Get "https://api.github.com/repos/fire-flying/IROViewer/actions/runs/42025961341?exclude_pull_r
+equests=true": net/http: TLS handshake timeout
+所在位置 行:15 字符: 3899
++ ... IROViewer"; gh run watch 42025961341 --exit-status --interval 30 *> w ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (failed to get r...ndshake timeout:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+EXIT=1

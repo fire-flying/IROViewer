@@ -44,11 +44,12 @@ final class PlayerEngine: NSObject, ObservableObject, VLCMediaPlayerDelegate {
         guard currentIndex >= 0, currentIndex < items.count else { return }
 
         let media = VLCMedia(url: items[currentIndex].url)
-        media.addOptions([
+        let options: [AnyHashable: Any] = [
             "network-caching": 1500,
             "clock-jitter": 0,
             "clock-synchro": 0
-        ])
+        ]
+        media.addOptions(options)
 
         mediaPlayer.media = media
         mediaPlayer.play()

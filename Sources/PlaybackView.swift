@@ -124,12 +124,12 @@ struct PhotoPreviewView: View {
 private struct VLCVideoContainer: UIViewRepresentable {
     @ObservedObject var engine: PlayerEngine
 
-    func makeUIView(context: Context) -> VLCVideoView {
-        let view = VLCVideoView()
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView()
         view.backgroundColor = .black
         engine.attach(drawable: view)
         return view
     }
 
-    func updateUIView(_ uiView: VLCVideoView, context: Context) {}
+    func updateUIView(_ uiView: UIView, context: Context) {}
 }
