@@ -89,9 +89,9 @@ final class LocalPlaylistServer {
                 response = "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
             }
 
-            connection.send(content: response.data(using: .utf8)) { _ in
+            connection.send(content: response.data(using: .utf8), completion: .contentProcessed { _ in
                 connection.cancel()
-            }
+            })
         }
     }
 }
